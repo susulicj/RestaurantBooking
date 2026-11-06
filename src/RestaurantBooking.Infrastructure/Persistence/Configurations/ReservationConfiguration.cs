@@ -16,8 +16,7 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
                .WithMany()
                .HasForeignKey(r => r.DiningTableId);
 
-        // Ključ za nedelju 3: sprečava dupli termin na istom stolu,
-        // ali otkazana rezervacija ne blokira termin
+      
         builder.HasIndex(r => new { r.DiningTableId, r.StartTimeUtc })
                .IsUnique()
                .HasFilter("\"Status\" <> 'Cancelled'");
