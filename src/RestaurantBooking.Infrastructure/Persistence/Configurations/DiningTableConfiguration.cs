@@ -11,5 +11,13 @@ public class DiningTableConfiguration : IEntityTypeConfiguration<DiningTable>
         builder.HasKey(t => t.Id);
         builder.HasIndex(t => t.Number).IsUnique();
         builder.Property(t => t.Capacity).IsRequired();
+
+        builder.HasData(
+            Enumerable.Range(1, 8).Select(i => new DiningTable
+            {
+                Id = i,
+                Number = i,
+                Capacity = i <= 3 ? 2 : i <= 6 ? 4 : 6
+            }));
     }
 }
