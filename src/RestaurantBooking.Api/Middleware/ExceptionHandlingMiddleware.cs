@@ -19,11 +19,20 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
         {
             await Write(context, StatusCodes.Status409Conflict, "Konflikt", ex.Message);
         }
+        catch (BadRequestException ex)
+        {
+            await Write(context, StatusCodes.Status400BadRequest, "Neispravan zahtev", ex.Message);
+        }
+        catch (UnauthorizedException ex)
+        {
+            await Write(context, StatusCodes.Status401Unauthorized, "Neautorizovan pristup", ex.Message);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Neobrađena greška");
             await Write(context, StatusCodes.Status500InternalServerError, "Greška na serveru", "Došlo je do neočekivane greške.");
         }
+        
     }
 
     private static Task Write(HttpContext context, int status, string title, string detail)

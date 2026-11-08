@@ -5,7 +5,7 @@ namespace RestaurantBooking.Domain.Entities;
 public class Reservation
 {
     public int Id { get; set; }
-    public string UserId { get; set; } = default!;   // Identity korisnik (nedelja 2)
+    public string UserId { get; set; } = default!;  
     public int DiningTableId { get; set; }
     public DiningTable DiningTable { get; set; } = default!;
     public DateTime StartTimeUtc { get; set; }
