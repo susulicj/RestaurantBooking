@@ -15,4 +15,6 @@ public class LoginRequest
     [Required] public string Password { get; set; } = default!;
 }
 
-public record AuthResponse(string UserId, string Email, IList<string> Roles);
+public record AuthResponse(string UserId, string Email, IList<string> Roles, string Token);
+
+
