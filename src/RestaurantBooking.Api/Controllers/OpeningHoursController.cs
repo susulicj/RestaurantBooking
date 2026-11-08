@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantBooking.Application.DTOs;
 using RestaurantBooking.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using RestaurantBooking.Application.Constants;
 
 namespace RestaurantBooking.Api.Controllers;
 
@@ -17,6 +19,7 @@ public class OpeningHoursController(IOpeningHoursService service) : ControllerBa
         Ok(await service.GetByIdAsync(id, ct));
 
     [HttpPost]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<ActionResult<OpeningHoursResponse>> Create(OpeningHoursRequest request, CancellationToken ct)
     {
         var created = await service.CreateAsync(request, ct);
@@ -24,6 +27,7 @@ public class OpeningHoursController(IOpeningHoursService service) : ControllerBa
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Update(int id, OpeningHoursRequest request, CancellationToken ct)
     {
         await service.UpdateAsync(id, request, ct);
@@ -31,6 +35,7 @@ public class OpeningHoursController(IOpeningHoursService service) : ControllerBa
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         await service.DeleteAsync(id, ct);
