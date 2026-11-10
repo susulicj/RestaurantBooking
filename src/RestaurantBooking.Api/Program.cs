@@ -14,10 +14,20 @@ using Microsoft.AspNetCore.Mvc;
 using FluentValidation;
 using RestaurantBooking.Api.Filters;
 using RestaurantBooking.Application.Validators;
+using Serilog;
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+builder.Host.UseSerilog((context, services, config) => config
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day));
+    
 builder.Services.AddControllers(options => options.Filters.Add<ValidationFilter>())
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -130,7 +140,7 @@ using (var scope = app.Services.CreateScope())
         app.Configuration["Seed:AdminPassword"]);
 }
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-
+app.UseSerilogRequestLogging();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
