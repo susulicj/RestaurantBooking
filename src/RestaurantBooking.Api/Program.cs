@@ -15,6 +15,7 @@ using FluentValidation;
 using RestaurantBooking.Api.Filters;
 using RestaurantBooking.Application.Validators;
 using Serilog;
+using RestaurantBooking.Application.Booking;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -65,6 +66,13 @@ builder.Services.AddSwaggerGen(c =>
             },
             Array.Empty<string>()
         }
+    });
+
+    c.MapType<DateOnly>(() => new OpenApiSchema
+    {
+        Type = "string",
+        Format = "date",
+        Example = new Microsoft.OpenApi.Any.OpenApiString("2026-11-20")
     });
 });
 builder.Services.AddDbContext<AppDbContext>(options =>options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
@@ -131,6 +139,9 @@ builder.Services
     });
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.Configure<BookingSettings>(builder.Configuration.GetSection(BookingSettings.SectionName));
+builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
+
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
