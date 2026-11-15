@@ -31,6 +31,11 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             logger.LogWarning(ex, "Unauthorized");
             await Write(context, StatusCodes.Status401Unauthorized, "Neautorizovan pristup", ex.Message);
         }
+        catch (ForbiddenException ex)
+        {
+            logger.LogWarning(ex, "Forbidden");
+            await Write(context, StatusCodes.Status403Forbidden, "Zabranjeno", ex.Message);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception");

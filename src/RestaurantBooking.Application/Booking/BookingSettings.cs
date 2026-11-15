@@ -8,4 +8,5 @@ public class BookingSettings
     public int DurationMinutes { get; set; } = 90;
     public int SlotIntervalMinutes { get; set; } = 30;
     public int MaxDaysAhead { get; set; } = 60;
+        public int CancellationMinHours { get; set; } = 24;
 }

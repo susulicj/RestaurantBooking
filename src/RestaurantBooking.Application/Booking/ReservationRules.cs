@@ -13,4 +13,8 @@ public static class ReservationRules
         var endSpan = startSpan + TimeSpan.FromMinutes(durationMinutes);
         return startSpan >= opensAt.ToTimeSpan() && endSpan <= closesAt.ToTimeSpan();
     }
+
+    public static bool CanCancel(DateTime startUtc, DateTime nowUtc, int minimumHours) =>
+        startUtc - nowUtc >= TimeSpan.FromHours(minimumHours);
+
 }

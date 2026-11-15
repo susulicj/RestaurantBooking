@@ -94,6 +94,73 @@ public class ReservationService(AppDbContext db, IOptions<BookingSettings> optio
 
         throw new ConflictException("Termin je upravo zauzet. Pokušaj ponovo.");
     }
+        public async Task<List<ReservationResponse>> GetMineAsync(string userId, CancellationToken ct)
+    {
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(_settings.TimeZoneId);
+
+        var items = await db.Reservations.AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.StartTimeUtc)
+            .Select(r => new { r.Id, r.DiningTable.Number, r.StartTimeUtc, r.EndTimeUtc, r.PartySize, r.Status })
+            .ToListAsync(ct);
+
+        return items.Select(r => new ReservationResponse(
+            r.Id, r.Number,
+            TimeZoneInfo.ConvertTimeFromUtc(r.StartTimeUtc, tz),
+            TimeZoneInfo.ConvertTimeFromUtc(r.EndTimeUtc, tz),
+            r.PartySize, r.Status)).ToList();
+    }
+
+    public async Task<ReservationResponse> GetByIdAsync(int id, string userId, bool isAdmin, CancellationToken ct)
+    {
+        var reservation = await FindVisibleAsync(id, userId, isAdmin, track: false, ct);
+        return ToResponse(reservation);
+    }
+
+    public async Task<ReservationResponse> CancelAsync(int id, string userId, bool isAdmin, CancellationToken ct)
+    {
+        var reservation = await FindVisibleAsync(id, userId, isAdmin, track: true, ct);
+
+        if (reservation.Status == ReservationStatus.Cancelled)
+            throw new ConflictException("Rezervacija je već otkazana.");
+
+        var nowUtc = DateTime.UtcNow;
+        if (reservation.StartTimeUtc <= nowUtc)
+            throw new ConflictException("Rezervacija je već počela ili prošla.");
+
+        if (!isAdmin && !ReservationRules.CanCancel(reservation.StartTimeUtc, nowUtc, _settings.CancellationMinHours))
+            throw new ForbiddenException(
+                $"Rezervaciju je moguće otkazati najkasnije {_settings.CancellationMinHours} sati pre termina.");
+
+        reservation.Status = ReservationStatus.Cancelled;
+        await db.SaveChangesAsync(ct);
+
+        return ToResponse(reservation);
+    }
+
+    private async Task<Reservation> FindVisibleAsync(
+        int id, string userId, bool isAdmin, bool track, CancellationToken ct)
+    {
+        var query = db.Reservations.Include(r => r.DiningTable).AsQueryable();
+        if (!track) query = query.AsNoTracking();
+
+        var reservation = await query.FirstOrDefaultAsync(r => r.Id == id, ct);
+
+        if (reservation is null || (!isAdmin && reservation.UserId != userId))
+            throw new NotFoundException($"Rezervacija sa id {id} ne postoji.");
+
+        return reservation;
+    }
+
+    private ReservationResponse ToResponse(Reservation r)
+    {
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(_settings.TimeZoneId);
+        return new ReservationResponse(
+            r.Id, r.DiningTable.Number,
+            TimeZoneInfo.ConvertTimeFromUtc(r.StartTimeUtc, tz),
+            TimeZoneInfo.ConvertTimeFromUtc(r.EndTimeUtc, tz),
+            r.PartySize, r.Status);
+    }
 
     private static bool IsOverlapViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException
