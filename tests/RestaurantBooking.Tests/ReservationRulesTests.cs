@@ -5,6 +5,17 @@ namespace RestaurantBooking.Tests;
 public class ReservationRulesTests
 {
     [Theory]
+    [InlineData(48, true)]
+    [InlineData(24, true)]    
+    [InlineData(23, false)]
+    [InlineData(1, false)]
+    public void Cancellation_window(int hoursBeforeStart, bool expected)
+    {
+        var now = new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc);
+        var start = now.AddHours(hoursBeforeStart);
+        Assert.Equal(expected, ReservationRules.CanCancel(start, now, 24));
+    }
+    [Theory]
     [InlineData(19, 0, true)]
     [InlineData(19, 30, true)]
     [InlineData(19, 15, false)]
