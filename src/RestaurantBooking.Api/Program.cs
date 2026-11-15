@@ -141,6 +141,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.Configure<BookingSettings>(builder.Configuration.GetSection(BookingSettings.SectionName));
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
+builder.Services.AddScoped<IReservationService, ReservationService>();
 
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
