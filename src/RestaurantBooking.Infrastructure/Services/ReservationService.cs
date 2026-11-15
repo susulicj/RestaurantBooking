@@ -43,46 +43,61 @@ public class ReservationService(AppDbContext db, IOptions<BookingSettings> optio
         if (hours is null || !ReservationRules.FitsOpeningHours(startTime, _settings.DurationMinutes, hours.OpensAt, hours.ClosesAt))
             throw new BadRequestException("Restoran u tom terminu ne radi.");
 
-        var tables = await db.Tables.AsNoTracking()
-            .Where(t => t.IsActive && t.Capacity >= request.PartySize)
-            .OrderBy(t => t.Capacity).ThenBy(t => t.Number)
-            .ToListAsync(ct);
+        const int maxAttempts = 3;
 
-        var busyTableIds = await db.Reservations.AsNoTracking()
-            .Where(r => r.Status != ReservationStatus.Cancelled
-                        && r.StartTimeUtc < endUtc
-                        && r.EndTimeUtc > startUtc)
-            .Select(r => r.DiningTableId)
-            .Distinct()
-            .ToListAsync(ct);
-
-        var table = tables.FirstOrDefault(t => !busyTableIds.Contains(t.Id))
-            ?? throw new ConflictException("Nema slobodnog stola za izabrani termin i broj gostiju.");
-
-        var reservation = new Reservation
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            UserId = userId,
-            DiningTableId = table.Id,
-            StartTimeUtc = startUtc,
-            EndTimeUtc = endUtc,
-            PartySize = request.PartySize,
-            Status = ReservationStatus.Confirmed,
-            CreatedAtUtc = nowUtc
-        };
+            var tables = await db.Tables.AsNoTracking()
+                .Where(t => t.IsActive && t.Capacity >= request.PartySize)
+                .OrderBy(t => t.Capacity).ThenBy(t => t.Number)
+                .ToListAsync(ct);
 
-        db.Reservations.Add(reservation);
+            var busyTableIds = await db.Reservations.AsNoTracking()
+                .Where(r => r.Status != ReservationStatus.Cancelled
+                            && r.StartTimeUtc < endUtc
+                            && r.EndTimeUtc > startUtc)
+                .Select(r => r.DiningTableId)
+                .Distinct()
+                .ToListAsync(ct);
 
-        try
-        {
-            await db.SaveChangesAsync(ct);
+            var table = tables.FirstOrDefault(t => !busyTableIds.Contains(t.Id));
+            if (table is null)
+                throw new ConflictException("Nema slobodnog stola za izabrani termin i broj gostiju.");
+
+            var reservation = new Reservation
+            {
+                UserId = userId,
+                DiningTableId = table.Id,
+                StartTimeUtc = startUtc,
+                EndTimeUtc = endUtc,
+                PartySize = request.PartySize,
+                Status = ReservationStatus.Confirmed,
+                CreatedAtUtc = nowUtc
+            };
+
+            db.Reservations.Add(reservation);
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+
+                return new ReservationResponse(
+                    reservation.Id, table.Number, localStart,
+                    localStart.AddMinutes(_settings.DurationMinutes),
+                    reservation.PartySize, reservation.Status);
+            }
+            catch (DbUpdateException ex) when (IsOverlapViolation(ex))
+            {
+                db.Entry(reservation).State = EntityState.Detached;
+            }
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            throw new ConflictException("Termin je upravo zauzet. Pokušaj ponovo.");
-        }
 
-        return new ReservationResponse(
-            reservation.Id, table.Number, localStart, localStart.AddMinutes(_settings.DurationMinutes),
-            reservation.PartySize, reservation.Status);
+        throw new ConflictException("Termin je upravo zauzet. Pokušaj ponovo.");
     }
+
+    private static bool IsOverlapViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ExclusionViolation
+        };
 }

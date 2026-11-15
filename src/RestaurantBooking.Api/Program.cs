@@ -16,6 +16,7 @@ using RestaurantBooking.Api.Filters;
 using RestaurantBooking.Application.Validators;
 using Serilog;
 using RestaurantBooking.Application.Booking;
+using Microsoft.Extensions.DependencyInjection;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -169,3 +170,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }
