@@ -21,9 +21,16 @@ public class ReservationsController(IReservationService service) : ControllerBas
     }
 
     [HttpGet("my")]
-    public async Task<ActionResult<List<ReservationResponse>>> GetMine(CancellationToken ct) =>
-        Ok(await service.GetMineAsync(User.GetUserId(), ct));
+    public async Task<ActionResult<PagedResult<ReservationResponse>>> GetMine(
+        [FromQuery] ReservationFilter filter, CancellationToken ct) =>
+        Ok(await service.GetMineAsync(User.GetUserId(), filter, ct));
 
+    [HttpGet]
+    [Authorize(Roles = Roles.Admin)]
+    public async Task<ActionResult<PagedResult<ReservationResponse>>> GetAll(
+        [FromQuery] AdminReservationFilter filter, CancellationToken ct) =>
+        Ok(await service.GetAllAsync(filter, ct));
+        
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ReservationResponse>> GetById(int id, CancellationToken ct) =>
         Ok(await service.GetByIdAsync(id, User.GetUserId(), User.IsInRole(Roles.Admin), ct));

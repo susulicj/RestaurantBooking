@@ -13,3 +13,24 @@ public class CreateReservationRequestValidator : AbstractValidator<CreateReserva
             .WithMessage("Broj gostiju mora biti između 1 i 20.");
     }
 }
+
+public class ReservationFilterValidator : AbstractValidator<ReservationFilter>
+{
+    public ReservationFilterValidator()
+    {
+        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 50);
+        RuleFor(x => x.Status).IsInEnum().When(x => x.Status.HasValue);
+        RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From!.Value)
+            .When(x => x.From.HasValue && x.To.HasValue)
+            .WithMessage("'to' ne može biti pre 'from'.");
+    }
+}
+
+public class AdminReservationFilterValidator : AbstractValidator<AdminReservationFilter>
+{
+    public AdminReservationFilterValidator()
+    {
+        Include(new ReservationFilterValidator());
+    }
+}

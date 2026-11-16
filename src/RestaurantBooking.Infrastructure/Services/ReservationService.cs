@@ -94,21 +94,56 @@ public class ReservationService(AppDbContext db, IOptions<BookingSettings> optio
 
         throw new ConflictException("Termin je upravo zauzet. Pokušaj ponovo.");
     }
-        public async Task<List<ReservationResponse>> GetMineAsync(string userId, CancellationToken ct)
+    public Task<PagedResult<ReservationResponse>> GetMineAsync(
+        string userId, ReservationFilter filter, CancellationToken ct) =>
+        QueryAsync(userId, filter, ct);
+
+    public Task<PagedResult<ReservationResponse>> GetAllAsync(
+        AdminReservationFilter filter, CancellationToken ct) =>
+        QueryAsync(filter.UserId, filter, ct);
+
+    private async Task<PagedResult<ReservationResponse>> QueryAsync(
+        string? userId, ReservationFilter filter, CancellationToken ct)
     {
         var tz = TimeZoneInfo.FindSystemTimeZoneById(_settings.TimeZoneId);
 
-        var items = await db.Reservations.AsNoTracking()
-            .Where(r => r.UserId == userId)
-            .OrderByDescending(r => r.StartTimeUtc)
+        var query = db.Reservations.AsNoTracking().AsQueryable();
+
+        if (userId is not null)
+            query = query.Where(r => r.UserId == userId);
+
+        if (filter.Status.HasValue)
+            query = query.Where(r => r.Status == filter.Status.Value);
+
+        if (filter.From.HasValue)
+        {
+            var fromUtc = TimeZoneInfo.ConvertTimeToUtc(filter.From.Value.ToDateTime(TimeOnly.MinValue), tz);
+            query = query.Where(r => r.StartTimeUtc >= fromUtc);
+        }
+
+        if (filter.To.HasValue)
+        {
+            var toUtc = TimeZoneInfo.ConvertTimeToUtc(
+                filter.To.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
+            query = query.Where(r => r.StartTimeUtc < toUtc);
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var rows = await query
+            .OrderByDescending(r => r.StartTimeUtc).ThenBy(r => r.Id)
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
             .Select(r => new { r.Id, r.DiningTable.Number, r.StartTimeUtc, r.EndTimeUtc, r.PartySize, r.Status })
             .ToListAsync(ct);
 
-        return items.Select(r => new ReservationResponse(
+        var items = rows.Select(r => new ReservationResponse(
             r.Id, r.Number,
             TimeZoneInfo.ConvertTimeFromUtc(r.StartTimeUtc, tz),
             TimeZoneInfo.ConvertTimeFromUtc(r.EndTimeUtc, tz),
             r.PartySize, r.Status)).ToList();
+
+        return new PagedResult<ReservationResponse>(items, filter.Page, filter.PageSize, totalCount);
     }
 
     public async Task<ReservationResponse> GetByIdAsync(int id, string userId, bool isAdmin, CancellationToken ct)
